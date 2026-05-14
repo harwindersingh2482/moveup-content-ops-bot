@@ -83,6 +83,31 @@ GROQ_MODEL=llama-3.1-8b-instant
 
 If no LLM key is present, the app still generates a deterministic structured report and the conversational agent answers with local analysis tools.
 
+## Deployment
+
+The live demo can be deployed on Streamlit Community Cloud.
+
+Use this main file path:
+
+```text
+frontend/dashboard.py
+```
+
+Recommended Streamlit secrets for a live demo:
+
+```toml
+YOUTUBE_API_KEY = "your-youtube-data-api-v3-key"
+USE_SAMPLE_DATA = "false"
+
+LLM_PROVIDER = "groq"
+GROQ_API_KEY = "your-groq-api-key"
+GROQ_MODEL = "llama-3.1-8b-instant"
+
+APP_ENV = "production"
+```
+
+For a no-key reviewer demo, set `USE_SAMPLE_DATA = "true"`.
+
 ## API Endpoints
 
 - `GET /health` - service health.
@@ -136,8 +161,8 @@ scripts/   Developer and operations scripts
 ## Next Extensions
 
 1. Add weekly scheduling for automatic report generation.
-2. Add a competitive benchmark for 2-3 comparable sports/media channels.
+2. Add saved competitive benchmark presets with README justification for selected channels.
 3. Store normalized metrics in SQLite with SQLAlchemy models for long-term history.
-4. Add deployed demo hosting and authentication for team usage.
+4. Add authentication for team usage.
 
 Generated JSON reports are local exports and are ignored by Git by default.
