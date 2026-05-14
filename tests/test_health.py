@@ -2,7 +2,8 @@
 
 from fastapi.testclient import TestClient
 
-from agents.content_ops_agent import answer_question
+from agents import content_ops_agent
+from agents.content_ops_agent import AGENT_SYSTEM_PROMPT, answer_question, build_agent_prompt
 from backend.main import app
 from services.analytics import enrich_videos
 from services.reporting import generate_performance_report
@@ -10,6 +11,22 @@ from services.sample_data import load_sample_videos
 from services.youtube import parse_iso8601_duration
 
 client = TestClient(app)
+
+
+class FakeOpenAI:
+    """Small test double for OpenAI chat completions."""
+
+    captured_messages = []
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.chat = self
+        self.completions = self
+
+    def create(self, **kwargs):
+        self.__class__.captured_messages = kwargs["messages"]
+        message = type("Message", (), {"content": "RAW LLM ANSWER"})
+        choice = type("Choice", (), {"message": message})
+        return type("Response", (), {"choices": [choice]})
 
 
 def test_health_check() -> None:
@@ -66,33 +83,56 @@ def test_report_endpoint_filters_by_publish_timeframe(monkeypatch) -> None:
     assert "Report timeframe" in payload["markdown"]
 
 
-def test_chat_endpoint_answers_from_current_report(monkeypatch) -> None:
+def test_chat_endpoint_returns_raw_llm_answer(monkeypatch) -> None:
     monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setenv("LLM_PROVIDER", "groq")
     monkeypatch.setenv("USE_SAMPLE_DATA", "true")
+    monkeypatch.setattr(content_ops_agent, "OpenAI", FakeOpenAI)
     client.get("/api/report?refresh=true")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
 
     response = client.post("/api/chat", json={"question": "Which video dropped the most?"})
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["source"] == "sample_data"
-    assert "improvement opportunity" in payload["answer"]
+    assert payload["answer"] == "RAW LLM ANSWER"
+    assert payload["tools_used"] == ["current_performance_report", "llm_reasoning"]
+    assert FakeOpenAI.captured_messages[0]["content"] == AGENT_SYSTEM_PROMPT
+    assert "Which video dropped the most?" in FakeOpenAI.captured_messages[1]["content"]
+    assert "Latest generated report:" in FakeOpenAI.captured_messages[1]["content"]
+    assert "Structured video metrics:" in FakeOpenAI.captured_messages[1]["content"]
 
 
-def test_agent_compares_channels_with_channel_level_metrics(monkeypatch) -> None:
+def test_agent_returns_raw_llm_response_without_local_override(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    report = generate_performance_report(load_sample_videos(), "sample_data")
+
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(content_ops_agent, "OpenAI", FakeOpenAI)
+
+    response = answer_question("Compare the channels and tell me which is stronger", report)
+
+    assert response.answer == "RAW LLM ANSWER"
+
+
+def test_agent_prompt_includes_report_metrics_and_question(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     report = generate_performance_report(load_sample_videos(), "sample_data")
-    response = answer_question("Compare the channels and tell me which is stronger", report)
+    prompt = build_agent_prompt("What should we focus on this week?", report)
 
-    assert "Channel comparison:" in response.answer
-    assert "avg views/video" in response.answer
-    assert "ThePlayoffsTV" in response.answer
-    assert "Netflu" in response.answer
+    assert "Question: What should we focus on this week?" in prompt
+    assert "Latest generated report:" in prompt
+    assert report.markdown in prompt
+    assert "Structured video metrics:" in prompt
+    assert "views=" in prompt
+    assert "engagement=" in prompt
 
 
 def test_enrich_videos_assigns_ratings() -> None:
