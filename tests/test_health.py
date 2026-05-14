@@ -6,6 +6,7 @@ from agents import content_ops_agent
 from agents.content_ops_agent import AGENT_SYSTEM_PROMPT, answer_question, build_agent_prompt
 from backend.main import app
 from services.analytics import enrich_videos
+from services.models import PerformanceReport, VideoMetric
 from services.reporting import generate_performance_report
 from services.sample_data import load_sample_videos
 from services.youtube import parse_iso8601_duration
@@ -102,7 +103,7 @@ def test_chat_endpoint_returns_raw_llm_answer(monkeypatch) -> None:
     assert payload["tools_used"] == ["current_performance_report", "llm_reasoning"]
     assert FakeOpenAI.captured_messages[0]["content"] == AGENT_SYSTEM_PROMPT
     assert "Which video dropped the most?" in FakeOpenAI.captured_messages[1]["content"]
-    assert "Latest generated report:" in FakeOpenAI.captured_messages[1]["content"]
+    assert "Latest generated report:" not in FakeOpenAI.captured_messages[1]["content"]
     assert "Structured video metrics:" in FakeOpenAI.captured_messages[1]["content"]
 
 
@@ -120,7 +121,7 @@ def test_agent_returns_raw_llm_response_without_local_override(monkeypatch) -> N
     assert response.answer == "RAW LLM ANSWER"
 
 
-def test_agent_prompt_includes_report_metrics_and_question(monkeypatch) -> None:
+def test_agent_prompt_includes_top_video_metrics_and_question(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
@@ -128,11 +129,57 @@ def test_agent_prompt_includes_report_metrics_and_question(monkeypatch) -> None:
     prompt = build_agent_prompt("What should we focus on this week?", report)
 
     assert "Question: What should we focus on this week?" in prompt
-    assert "Latest generated report:" in prompt
-    assert report.markdown in prompt
+    assert "Latest generated report:" not in prompt
+    assert report.markdown not in prompt
     assert "Structured video metrics:" in prompt
     assert "views=" in prompt
     assert "engagement=" in prompt
+    assert "likes=" in prompt
+    assert "comments=" in prompt
+    assert "views_per_day=" in prompt
+
+
+def test_agent_prompt_truncates_to_top_10_videos_by_views_per_channel() -> None:
+    videos = [
+        VideoMetric(
+            video_id=f"alpha-{index}",
+            channel_name="Alpha",
+            channel_handle="@Alpha",
+            title=f"Alpha video {index}",
+            published_at="2026-05-01T00:00:00Z",
+            url=f"https://example.com/alpha-{index}",
+            views=index,
+        )
+        for index in range(12)
+    ] + [
+        VideoMetric(
+            video_id=f"beta-{index}",
+            channel_name="Beta",
+            channel_handle="@Beta",
+            title=f"Beta video {index}",
+            published_at="2026-05-01T00:00:00Z",
+            url=f"https://example.com/beta-{index}",
+            views=index,
+        )
+        for index in range(12)
+    ]
+    report = PerformanceReport(
+        source="sample_data",
+        generated_at="2026-05-14T00:00:00Z",
+        summary="summary",
+        markdown="FULL REPORT MARKDOWN",
+        videos=videos,
+        channels=[],
+    )
+
+    prompt = build_agent_prompt("Which videos matter?", report)
+
+    assert prompt.count("- Alpha:") == 10
+    assert prompt.count("- Beta:") == 10
+    assert "Alpha video 0;" not in prompt
+    assert "Alpha video 1;" not in prompt
+    assert "Beta video 0;" not in prompt
+    assert "Beta video 1;" not in prompt
 
 
 def test_enrich_videos_assigns_ratings() -> None:

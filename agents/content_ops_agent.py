@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from openai import OpenAI
 
-from services.models import ChatResponse, PerformanceReport
+from services.models import ChatResponse, PerformanceReport, VideoMetric
 from services.settings import get_llm_api_key, get_llm_base_url, get_llm_model
 
 AGENT_SYSTEM_PROMPT = """You are a senior content operations analyst for a digital media agency.
@@ -15,7 +17,6 @@ Your job is to answer operator questions with sharp, actionable intelligence, no
 CONTEXT YOU RECEIVE:
 - Structured video metrics: title, views, likes, comments, engagement rate, views_per_day,
   publish date, channel name
-- A pre-generated performance report in Markdown
 - The selected channels and report window
 
 ANSWER RULES:
@@ -98,19 +99,49 @@ def answer_question(question: str, report: PerformanceReport) -> ChatResponse:
 
 def build_agent_prompt(question: str, report: PerformanceReport) -> str:
     """Build the agent prompt from the latest report and compact metrics."""
-    rows = "\n".join(
-        (
-            f"- {video.channel_name}: {video.title}; rating={video.rating}; score={video.score}; "
-            f"views={video.views}; engagement={video.engagement_rate:.2%}; "
-            f"reason={video.rating_reason}"
-        )
-        for video in report.videos
-    )
-    return f"""Question: {question}
-
-Latest generated report:
-{report.markdown}
-
-Structured video metrics:
+    rows = "\n".join(format_video_metric(video) for video in top_videos_by_channel(report.videos))
+    timeframe = format_report_timeframe(report)
+    return f"""Structured video metrics{timeframe}:
 {rows}
+
+Question: {question}
 """
+
+
+def top_videos_by_channel(videos: list[VideoMetric], limit: int = 10) -> list[VideoMetric]:
+    """Return each channel's top videos by views, preserving channel grouping."""
+    videos_by_channel: dict[str, list[VideoMetric]] = defaultdict(list)
+    for video in videos:
+        videos_by_channel[video.channel_name].append(video)
+
+    top_videos: list[VideoMetric] = []
+    for channel_name in sorted(videos_by_channel):
+        top_videos.extend(
+            sorted(
+                videos_by_channel[channel_name],
+                key=lambda video: video.views,
+                reverse=True,
+            )[:limit]
+        )
+    return top_videos
+
+
+def format_video_metric(video: VideoMetric) -> str:
+    """Format one video record for compact LLM context."""
+    return (
+        f"- {video.channel_name}: {video.title}; published={video.published_at}; "
+        f"views={video.views}; likes={video.likes}; comments={video.comments}; "
+        f"engagement={video.engagement_rate:.2%}; views_per_day={video.views_per_day:.1f}; "
+        f"rating={video.rating}; score={video.score}; reason={video.rating_reason}"
+    )
+
+
+def format_report_timeframe(report: PerformanceReport) -> str:
+    """Format selected timeframe when available."""
+    if report.timeframe_start and report.timeframe_end:
+        return f" ({report.timeframe_start} to {report.timeframe_end})"
+    if report.timeframe_start:
+        return f" (from {report.timeframe_start})"
+    if report.timeframe_end:
+        return f" (through {report.timeframe_end})"
+    return ""
