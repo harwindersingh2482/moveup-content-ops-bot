@@ -33,8 +33,12 @@ class YouTubeMetricsClient:
             self._service = build("youtube", "v3", developerKey=self.api_key)
         return self._service
 
-    def fetch_moveup_videos(self, limit_per_channel: int = 10) -> tuple[list[VideoMetric], str]:
-        """Fetch MoveUp Media videos, or sample data if configured."""
+    def fetch_moveup_videos(
+        self,
+        limit_per_channel: int = 10,
+        channels: tuple[ChannelConfig, ...] = MOVEUP_CHANNELS,
+    ) -> tuple[list[VideoMetric], str]:
+        """Fetch videos for the selected YouTube channels, or sample data if configured."""
         if not self.api_key:
             if use_sample_data():
                 sample_limit = limit_per_channel * len(MOVEUP_CHANNELS)
@@ -42,7 +46,7 @@ class YouTubeMetricsClient:
             raise YouTubeDataError("Set YOUTUBE_API_KEY or USE_SAMPLE_DATA=true.")
 
         videos: list[VideoMetric] = []
-        for channel in MOVEUP_CHANNELS:
+        for channel in channels:
             channel_id = self.resolve_channel_id(channel)
             upload_playlist_id = self.fetch_upload_playlist_id(channel_id)
             video_ids = self.fetch_recent_video_ids(upload_playlist_id, 50)
@@ -52,6 +56,9 @@ class YouTubeMetricsClient:
 
     def resolve_channel_id(self, channel: ChannelConfig) -> str:
         """Resolve a channel handle such as @Netflu to a YouTube channel id."""
+        if channel.handle.startswith("UC"):
+            return channel.handle
+
         response = (
             self.service.channels()
             .list(part="id", forHandle=channel.handle.lstrip("@"))

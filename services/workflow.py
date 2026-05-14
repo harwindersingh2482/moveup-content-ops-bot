@@ -6,35 +6,38 @@ from datetime import UTC, datetime
 
 from services.models import PerformanceReport, VideoMetric
 from services.reporting import generate_performance_report
-from services.settings import PROJECT_ROOT
+from services.settings import MOVEUP_CHANNELS, PROJECT_ROOT, ChannelConfig
 from services.youtube import YouTubeMetricsClient
 
-_cached_reports: dict[tuple[str | None, str | None], PerformanceReport] = {}
+_cached_reports: dict[tuple[tuple[str, ...], str | None, str | None], PerformanceReport] = {}
 
 
 def get_or_create_report(
     refresh: bool = False,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    channels: tuple[ChannelConfig, ...] = MOVEUP_CHANNELS,
 ) -> PerformanceReport:
     """Return the latest report, refreshing data when requested."""
     normalized_start = _normalize_datetime(start_at)
     normalized_end = _normalize_datetime(end_at)
     cache_key = (
+        tuple(channel.handle for channel in channels),
         normalized_start.isoformat() if normalized_start else None,
         normalized_end.isoformat() if normalized_end else None,
     )
     if cache_key not in _cached_reports or refresh:
         limit_per_channel = 50 if normalized_start or normalized_end else 10
         raw_videos, source = YouTubeMetricsClient().fetch_moveup_videos(
-            limit_per_channel=limit_per_channel
+            limit_per_channel=limit_per_channel,
+            channels=channels,
         )
         filtered_videos = filter_videos_by_timeframe(raw_videos, normalized_start, normalized_end)
         report = generate_performance_report(
             filtered_videos,
             source,
-            timeframe_start=cache_key[0],
-            timeframe_end=cache_key[1],
+            timeframe_start=cache_key[1],
+            timeframe_end=cache_key[2],
         )
         _cached_reports[cache_key] = report
         _save_report(report)

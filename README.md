@@ -6,7 +6,8 @@ The app collects the last 10 videos from the official MoveUp channels, scores re
 
 ## What It Does
 
-- Collects public YouTube metrics for `@Netflu` and `@ThePlayoffsTV`.
+- Collects public YouTube metrics for `@Netflu` and `@ThePlayoffsTV` by default.
+- Lets operators paste YouTube channel handles or channel links to compare up to 6 channels.
 - Filters dashboards, source data sheets, CSV exports, and reports by selected publish date/time.
 - Analyzes views, likes, comments, engagement rate, recency velocity, and relative channel benchmarks.
 - Produces a Markdown performance report with channel summaries, per-video ratings, top/bottom videos, and actionable recommendations.
@@ -45,6 +46,14 @@ streamlit run frontend/dashboard.py \
 ```
 
 Open Streamlit at `http://localhost:8501`.
+
+In the sidebar, paste one YouTube channel per line. Supported formats include:
+
+```text
+@Netflu
+https://www.youtube.com/@ThePlayoffsTV
+https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx
+```
 
 ## API Keys
 

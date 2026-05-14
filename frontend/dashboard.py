@@ -6,6 +6,7 @@ import os
 import sys
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 import plotly.express as px
@@ -17,13 +18,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agents.content_ops_agent import answer_question  # noqa: E402
+from services.settings import MOVEUP_CHANNELS, ChannelConfig  # noqa: E402
 from services.workflow import get_or_create_report  # noqa: E402
 
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 APP_ENV = os.getenv("APP_ENV", "local")
-BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
-BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
 
 st.set_page_config(
     page_title="MoveUp Content Ops Bot",
@@ -129,9 +129,70 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def parse_channel_input(raw_value: str) -> list[ChannelConfig]:
+    """Parse newline-separated YouTube channel handles or URLs into channel configs."""
+    channels: list[ChannelConfig] = []
+    seen: set[str] = set()
+    for raw_line in raw_value.splitlines():
+        identifier = normalize_channel_identifier(raw_line)
+        if not identifier or identifier in seen:
+            continue
+        seen.add(identifier)
+        channels.append(
+            ChannelConfig(name=display_name_from_identifier(identifier), handle=identifier)
+        )
+    return channels
+
+
+def normalize_channel_identifier(raw_value: str) -> str:
+    """Return a YouTube handle, channel id, or search string from user input."""
+    value = raw_value.strip()
+    if not value:
+        return ""
+
+    if "youtube.com" not in value and "youtu.be" not in value:
+        return value if value.startswith("@") or value.startswith("UC") else f"@{value}"
+
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if not path_parts:
+        return ""
+
+    first_part = path_parts[0]
+    if first_part.startswith("@"):
+        return first_part
+    if first_part == "channel" and len(path_parts) > 1:
+        return path_parts[1]
+    if first_part in {"c", "user"} and len(path_parts) > 1:
+        return path_parts[1]
+    return first_part
+
+
+def display_name_from_identifier(identifier: str) -> str:
+    """Create a compact display name before YouTube returns official channel metadata."""
+    return identifier.lstrip("@").replace("-", " ").replace("_", " ").strip() or identifier
+
+
 with st.sidebar:
     st.header("Controls")
     refresh = st.button("Refresh data", type="primary", use_container_width=True)
+    st.divider()
+    st.subheader("Channels")
+    channel_input = st.text_area(
+        "Paste channel links or handles",
+        value="\n".join(channel.handle for channel in MOVEUP_CHANNELS),
+        height=130,
+        help="One per line. Supports @handles and youtube.com/@handle or /channel/UC... links.",
+    )
+    selected_source_channels = parse_channel_input(channel_input)
+    if len(selected_source_channels) > 6:
+        st.warning("Using the first 6 channels to keep the dashboard responsive.")
+        selected_source_channels = selected_source_channels[:6]
+    if not selected_source_channels:
+        st.error("Add at least one valid YouTube channel handle or link.")
+        st.stop()
+    st.caption(f"{len(selected_source_channels)} channel(s) selected")
     st.divider()
     st.subheader("Report Window")
     window_mode = st.selectbox(
@@ -162,13 +223,16 @@ with st.sidebar:
         st.error("Start date/time must be before end date/time.")
         st.stop()
     st.divider()
-    st.caption("Runtime")
-    st.write(f"Environment: `{APP_ENV}`")
-    st.write(f"Backend: `http://{BACKEND_HOST}:{BACKEND_PORT}`")
+    st.caption(f"Environment: `{APP_ENV}`")
     st.caption("Source rules")
     st.write("Facts come directly from YouTube Data API v3. AI text is separated from raw data.")
 
-report = get_or_create_report(refresh=refresh, start_at=start_at, end_at=end_at)
+report = get_or_create_report(
+    refresh=refresh,
+    start_at=start_at,
+    end_at=end_at,
+    channels=tuple(selected_source_channels),
+)
 videos = report.videos
 channels = report.channels
 
@@ -237,6 +301,7 @@ st.markdown(
     f"""
     <div class="source-band">
     <strong>Source of truth:</strong> {source_label}<br>
+    <strong>Channels:</strong> {", ".join(channel.name for channel in selected_source_channels)}<br>
     <strong>Report window:</strong> {timeframe_label}<br>
     <strong>Scope:</strong> public playable uploads matching the selected window<br>
     <strong>Collected:</strong> {collected_at}<br>
