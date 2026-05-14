@@ -1,14 +1,16 @@
 # MoveUp Content Ops Bot
 
-AI-powered management workspace for MoveUp Media's YouTube content operations.
+AI-powered management workspace for YouTube content operations and channel benchmarking.
 
-The app collects the last 10 videos from the official MoveUp channels, scores recent performance, generates a structured report, and lets operators ask natural-language questions through a conversational content ops agent.
+The app collects public video metrics from any YouTube channel handles or channel URLs pasted into the sidebar, filters the dataset by a selected publish-time window, scores performance, generates a structured report, and lets operators ask natural-language questions through a conversational content ops agent.
 
 ## What It Does
 
-- Collects public YouTube metrics for `@Netflu` and `@ThePlayoffsTV` by default.
-- Lets operators paste YouTube channel handles or channel links to compare up to 6 channels.
-- Filters dashboards, source data sheets, CSV exports, and reports by selected publish date/time.
+- Starts with `@Netflu` and `@ThePlayoffsTV` by default for the MoveUp Media test case.
+- Lets operators paste any public YouTube channel handles or channel links to compare up to 6 channels.
+- Supports publish-time windows: latest uploads, last 7 days, last 30 days, or a custom date/time range.
+- Uses the latest 10 public uploads per selected channel by default, and expands the fetch window when date filters are active so reports can cover broader ranges.
+- Filters dashboards, source data sheets, CSV exports, and reports by the selected channel set and publish-time range.
 - Analyzes views, likes, comments, engagement rate, recency velocity, and relative channel benchmarks.
 - Produces a Markdown performance report with channel summaries, per-video ratings, top/bottom videos, and actionable recommendations.
 - Exposes the workflow through a FastAPI backend and Streamlit management platform.
@@ -47,13 +49,15 @@ streamlit run frontend/dashboard.py \
 
 Open Streamlit at `http://localhost:8501`.
 
-In the sidebar, paste one YouTube channel per line. Supported formats include:
+In the sidebar, paste one YouTube channel per line. The app works with public YouTube channels, not only the default MoveUp channels. Supported formats include:
 
 ```text
 @Netflu
 https://www.youtube.com/@ThePlayoffsTV
 https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+Use the Report Window control to switch between latest uploads, last 7 days, last 30 days, or a custom date/time range.
 
 ## API Keys
 
@@ -111,7 +115,7 @@ For a no-key reviewer demo, set `USE_SAMPLE_DATA = "true"`.
 ## API Endpoints
 
 - `GET /health` - service health.
-- `GET /api/report?refresh=true` - fetch metrics and generate the report.
+- `GET /api/report?refresh=true` - fetch default channel metrics and generate the report.
 - `GET /api/report?start_at=2026-04-01T00:00:00Z&end_at=2026-05-01T23:59:00Z` - generate a report for a publish-time window.
 - `GET /api/videos` - return normalized video metrics, with optional `start_at` and `end_at` query parameters.
 - `POST /api/chat` - ask the conversational agent a question.
@@ -161,7 +165,7 @@ scripts/   Developer and operations scripts
 ## Next Extensions
 
 1. Add weekly scheduling for automatic report generation.
-2. Add saved competitive benchmark presets with README justification for selected channels.
+2. Add saved channel benchmark presets for recurring competitor sets.
 3. Store normalized metrics in SQLite with SQLAlchemy models for long-term history.
 4. Add authentication for team usage.
 
