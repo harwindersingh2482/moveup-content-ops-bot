@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  frontend:
+    build:
+      context: .
+    command: streamlit run frontend/dashboard.py --server.address 0.0.0.0 --server.port 8501
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      - backend
