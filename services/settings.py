@@ -59,7 +59,7 @@ def get_llm_model() -> str:
     """Return the model name for the configured LLM provider."""
     provider = get_llm_provider()
     if provider == "groq":
-        return os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        return os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
     return get_openai_model()
 
 
