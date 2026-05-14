@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from openai import OpenAI
 
 from services.models import ChatResponse, PerformanceReport, VideoMetric
@@ -99,7 +97,7 @@ def answer_question(question: str, report: PerformanceReport) -> ChatResponse:
 
 def build_agent_prompt(question: str, report: PerformanceReport) -> str:
     """Build the agent prompt from the latest report and compact metrics."""
-    rows = "\n".join(format_video_metric(video) for video in top_videos_by_channel(report.videos))
+    rows = "\n".join(format_video_metric(video) for video in top_videos(report.videos))
     timeframe = format_report_timeframe(report)
     return f"""Structured video metrics{timeframe}:
 {rows}
@@ -108,22 +106,9 @@ Question: {question}
 """
 
 
-def top_videos_by_channel(videos: list[VideoMetric], limit: int = 10) -> list[VideoMetric]:
-    """Return each channel's top videos by views, preserving channel grouping."""
-    videos_by_channel: dict[str, list[VideoMetric]] = defaultdict(list)
-    for video in videos:
-        videos_by_channel[video.channel_name].append(video)
-
-    top_videos: list[VideoMetric] = []
-    for channel_name in sorted(videos_by_channel):
-        top_videos.extend(
-            sorted(
-                videos_by_channel[channel_name],
-                key=lambda video: video.views,
-                reverse=True,
-            )[:limit]
-        )
-    return top_videos
+def top_videos(videos: list[VideoMetric], limit: int = 20) -> list[VideoMetric]:
+    """Return the highest-view videos for compact LLM context."""
+    return sorted(videos, key=lambda video: video.views, reverse=True)[:limit]
 
 
 def format_video_metric(video: VideoMetric) -> str:

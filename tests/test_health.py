@@ -139,7 +139,7 @@ def test_agent_prompt_includes_top_video_metrics_and_question(monkeypatch) -> No
     assert "views_per_day=" in prompt
 
 
-def test_agent_prompt_truncates_to_top_10_videos_by_views_per_channel() -> None:
+def test_agent_prompt_truncates_to_20_videos_by_views() -> None:
     videos = [
         VideoMetric(
             video_id=f"alpha-{index}",
@@ -174,8 +174,7 @@ def test_agent_prompt_truncates_to_top_10_videos_by_views_per_channel() -> None:
 
     prompt = build_agent_prompt("Which videos matter?", report)
 
-    assert prompt.count("- Alpha:") == 10
-    assert prompt.count("- Beta:") == 10
+    assert prompt.count("- ") == 20
     assert "Alpha video 0;" not in prompt
     assert "Alpha video 1;" not in prompt
     assert "Beta video 0;" not in prompt
