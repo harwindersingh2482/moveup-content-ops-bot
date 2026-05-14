@@ -62,6 +62,9 @@ def answer_with_local_tools(question: str, videos: list[VideoMetric]) -> str:
             f"{video.engagement_rate:.2%} engagement. {video.rating_reason}"
         )
 
+    if any(term in normalized for term in ["compare", "channel", "channels", "stronger"]):
+        return _compare_channels(videos)
+
     if any(term in normalized for term in ["best", "top", "strong", "worked"]):
         video = top_videos(videos, 1)[0]
         return (
@@ -83,19 +86,43 @@ def answer_with_local_tools(question: str, videos: list[VideoMetric]) -> str:
             )
         return " ".join(recommendations)
 
-    if any(term in normalized for term in ["compare", "channel", "channels"]):
-        totals: dict[str, int] = {}
-        for video in videos:
-            totals[video.channel_name] = totals.get(video.channel_name, 0) + video.views
-        ordered = sorted(totals.items(), key=lambda item: item[1], reverse=True)
-        return "Channel comparison by recent views: " + "; ".join(
-            f"{channel} {views:,} views" for channel, views in ordered
-        )
-
     return (
         "The current report shows the strongest opportunities are to repeat high-scoring topics, "
         "tighten the first 30 seconds of underperforming formats, and track engagement rate as the "
         "best public proxy for audience resonance."
+    )
+
+
+def _compare_channels(videos: list[VideoMetric]) -> str:
+    """Compare selected channels on public performance metrics."""
+    by_channel: dict[str, list[VideoMetric]] = {}
+    for video in videos:
+        by_channel.setdefault(video.channel_name, []).append(video)
+
+    rows = []
+    for channel_name, channel_videos in by_channel.items():
+        total_views = sum(video.views for video in channel_videos)
+        avg_views = total_views / len(channel_videos)
+        avg_engagement = sum(video.engagement_rate for video in channel_videos) / len(
+            channel_videos
+        )
+        avg_score = sum(video.score for video in channel_videos) / len(channel_videos)
+        top_video = max(channel_videos, key=lambda video: video.score)
+        rows.append((channel_name, total_views, avg_views, avg_engagement, avg_score, top_video))
+
+    ordered = sorted(rows, key=lambda row: (row[1], row[4]), reverse=True)
+    leader = ordered[0]
+    comparison = "; ".join(
+        (
+            f"{channel}: {total_views:,} views, {avg_views:,.0f} avg views/video, "
+            f"{avg_engagement:.2%} avg engagement"
+        )
+        for channel, total_views, avg_views, avg_engagement, _, _ in ordered
+    )
+    return (
+        f"{leader[0]} is strongest on recent public performance, led by {leader[1]:,} total "
+        f"views and {leader[2]:,.0f} average views per video. Channel comparison: {comparison}. "
+        f"Best topic signal: '{leader[5].title}'."
     )
 
 

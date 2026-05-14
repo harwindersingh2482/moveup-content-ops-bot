@@ -176,7 +176,7 @@ def display_name_from_identifier(identifier: str) -> str:
 
 with st.sidebar:
     st.header("Controls")
-    refresh = st.button("Refresh data", type="primary", use_container_width=True)
+    refresh = st.button("Refresh data", type="primary", width="stretch")
     st.divider()
     st.subheader("Channels")
     channel_input = st.text_area(
@@ -367,7 +367,7 @@ with tab_overview:
                 coloraxis_colorbar_title="Engagement",
                 margin={"l": 10, "r": 10, "t": 30, "b": 10},
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with right:
             st.subheader("Top Ranked Videos")
@@ -388,7 +388,7 @@ with tab_overview:
                     ]
                 ],
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     "thumbnail_url": st.column_config.ImageColumn("Preview"),
                     "channel_name": "Channel",
@@ -433,7 +433,7 @@ with tab_videos:
                 ]
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             height=560,
             column_config={
                 "thumbnail_url": st.column_config.ImageColumn("Preview"),
@@ -456,7 +456,7 @@ with tab_videos:
             filtered_df.to_csv(index=False).encode("utf-8"),
             "moveup_youtube_source_data.csv",
             "text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
 with tab_report:

@@ -2,8 +2,10 @@
 
 from fastapi.testclient import TestClient
 
+from agents.content_ops_agent import answer_question
 from backend.main import app
 from services.analytics import enrich_videos
+from services.reporting import generate_performance_report
 from services.sample_data import load_sample_videos
 from services.youtube import parse_iso8601_duration
 
@@ -31,7 +33,7 @@ def test_report_endpoint_uses_sample_data_without_keys(monkeypatch) -> None:
     payload = response.json()
     assert payload["source"] == "sample_data"
     assert len(payload["videos"]) == 20
-    assert "MoveUp Content Performance Report" in payload["markdown"]
+    assert "YouTube Content Performance Report" in payload["markdown"]
 
 
 def test_report_endpoint_filters_by_publish_timeframe(monkeypatch) -> None:
@@ -78,6 +80,19 @@ def test_chat_endpoint_answers_from_current_report(monkeypatch) -> None:
     payload = response.json()
     assert payload["source"] == "sample_data"
     assert "improvement opportunity" in payload["answer"]
+
+
+def test_agent_compares_channels_with_channel_level_metrics(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    report = generate_performance_report(load_sample_videos(), "sample_data")
+    response = answer_question("Compare the channels and tell me which is stronger", report)
+
+    assert "Channel comparison:" in response.answer
+    assert "avg views/video" in response.answer
+    assert "ThePlayoffsTV" in response.answer
+    assert "Netflu" in response.answer
 
 
 def test_enrich_videos_assigns_ratings() -> None:

@@ -4,12 +4,12 @@
 
 ## Runtime Flow
 
-1. `services.youtube.YouTubeMetricsClient` resolves `@Netflu` and `@ThePlayoffsTV`, fetches the 10 most recent public videos per channel, and normalizes snippet, statistics, and duration data.
+1. `services.youtube.YouTubeMetricsClient` resolves selected public YouTube channel handles or channel IDs, fetches recent public uploads for each channel, and normalizes snippet, statistics, and duration data.
 2. `services.analytics` calculates engagement rate, views per day, relative score, rating, top/bottom videos, and channel recommendations.
 3. `services.reporting` sends the structured context to an LLM when `OPENAI_API_KEY` is configured. Without an LLM key, it builds the same report shape deterministically.
-4. `agents.content_ops_agent` answers natural-language questions from the latest report and metrics.
+4. `agents.content_ops_agent` answers natural-language questions from the latest selected-channel report and metrics.
 5. `backend.main` exposes the workflow over FastAPI.
-6. `frontend.dashboard` presents the management interface in Streamlit.
+6. `frontend.dashboard` presents the management interface in Streamlit with channel input, publish-time filters, source data, reports, and chat.
 
 ## Components
 

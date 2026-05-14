@@ -10,8 +10,8 @@ from services.analytics import bottom_videos, enrich_videos, summarize_channels,
 from services.models import PerformanceReport, VideoMetric
 from services.settings import get_llm_api_key, get_llm_base_url, get_llm_model
 
-REPORT_SYSTEM_PROMPT = """You are a senior media analyst for MoveUp Media, a digital agency.
-Analyze YouTube performance for weekly content operations. Be concrete, business-focused,
+REPORT_SYSTEM_PROMPT = """You are a senior YouTube content operations analyst.
+Analyze channel performance for weekly content operations. Be concrete, business-focused,
 and useful to channel managers. Public YouTube data does not expose CTR or audience retention,
 so never invent those metrics; instead use views, engagement rate, comments, likes, recency,
 and relative channel benchmarks.
@@ -78,14 +78,15 @@ def build_report_prompt(videos: list[VideoMetric]) -> str:
         )
         for video in videos
     )
-    return f"""Create a Markdown performance report for MoveUp Media's last 10 videos per channel.
+    channel_count = len({video.channel_name for video in videos})
+    return f"""Create a Markdown performance report for the selected YouTube dataset.
 
 Required sections:
-1. Executive summary across both channels.
+1. Executive summary across the selected {channel_count} channel(s).
 2. Per-channel analysis.
 3. Per-video rating table with rating strong / average / underperforming and one brief reason.
 4. Top 2-3 videos and bottom 2-3 videos with reasoning.
-5. At least one concrete, actionable recommendation per channel for next week.
+5. At least one concrete, actionable recommendation per selected channel.
 
 Tone: professional, direct, actionable. Avoid generic advice.
 Accuracy rules:
@@ -131,7 +132,7 @@ def build_fallback_markdown(
     top = top_videos(videos)
     bottom = bottom_videos(videos)
     lines = [
-        "# MoveUp Content Performance Report",
+        "# YouTube Content Performance Report",
         "",
         "## Executive Summary",
         f"Timeframe: {timeframe_label}",
@@ -181,11 +182,12 @@ def build_summary(videos: list[VideoMetric]) -> str:
     strongest = max(videos, key=lambda video: video.score)
     weakest = min(videos, key=lambda video: video.score)
     channel_count = len({video.channel_name for video in videos})
+    channel_label = "channel" if channel_count == 1 else "channels"
     return (
         f"Analyzed {len(videos)} recent videos across {channel_count} "
-        f"MoveUp channels. The set generated {total_views:,} views with an average engagement rate "
-        f"of {avg_engagement:.2%}. Strongest performer: '{strongest.title}'. Biggest improvement "
-        f"opportunity: '{weakest.title}'."
+        f"selected {channel_label}. The set generated {total_views:,} views with an average "
+        f"engagement rate of {avg_engagement:.2%}. Strongest performer: '{strongest.title}'. "
+        f"Biggest improvement opportunity: '{weakest.title}'."
     )
 
 
