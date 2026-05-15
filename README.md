@@ -4,6 +4,8 @@ AI-powered YouTube content operations platform for MoveUp Media. Fetches public 
 
 **Live demo:** https://moveup-content-ops-bot.streamlit.app/
 
+**Demo video:** https://vimeo.com/1192435500?share=copy&fl=sv&fe=ci
+
 ---
 
 ## What It Does
